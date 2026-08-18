@@ -15,6 +15,7 @@ using FungleAPI.Teams;
 using FungleAPI.Utilities;
 using InnerNet;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -28,83 +29,22 @@ namespace FungleAPI.Api
     public class NormalGameMode : BaseGameMode
     {
         public static Func<IReadOnlyDictionary<byte, RoleTypes>> ConsumeRoleAssignmentOverrides;
-        public override StringNames GameModeName => StringNames.GameTypeClassic;
-        public override int RequiredPlayerToStart() => 4;
-        public override float CalculateLightRadius(NetworkedPlayerInfo player, bool airship)
+        public override StringNames GameModeName => StringNames.GameTypeClassic;        
+        public override PlayerBodyTypes GetBodyType(PlayerControl player)
         {
-            ShipStatus ship = ShipStatus.Instance;
-            float Base()
+            if (AprilFoolsMode.ShouldHorseAround())
             {
-                if (player == null || player.IsDead)
-                {
-                    return ship.MaxLightRadius;
-                }
-                if (player.Role.IsImpostor)
-                {
-                    return ship.MaxLightRadius * GameOptionsManager.Instance.CurrentGameOptions.GetFloat(FloatOptionNames.ImpostorLightMod);
-                }
-                float t = 1f;
-                ISystemType systemType;
-                if (ship.Systems.TryGetValue(SystemTypes.Electrical, out systemType))
-                {
-                    t = systemType.SafeCast<SwitchSystem>().Value / 255f;
-                }
-                return Mathf.Lerp(ship.MinLightRadius, ship.MaxLightRadius, t) * GameOptionsManager.Instance.CurrentGameOptions.GetFloat(FloatOptionNames.CrewLightMod);
+                return PlayerBodyTypes.Horse;
             }
-            if (airship)
+            if (AprilFoolsMode.ShouldLongAround())
             {
-                AirshipStatus airshipStatus = ship.SafeCast<AirshipStatus>();
-
-                float num = Base();
-                if (player.Role.AffectedByLightAffectors)
-                {
-                    foreach (LightAffector lightAffector in airshipStatus.LightAffectors)
-                    {
-                        if (player.Object && player.Object.Collider.IsTouching(lightAffector.Hitbox))
-                        {
-                            num *= lightAffector.Multiplier;
-                        }
-                    }
-                }
-                return num;
+                return PlayerBodyTypes.Long;
             }
-            return Base();
-        }
-        public override void AdjustLighting(PlayerControl playerControl)
-        {
-            if (playerControl == null || playerControl.Data == null) return;
-
-            float flashlightSize = 0f;
-            if (IsFlashlightEnabled(playerControl))
+            if (AprilFoolsMode.ShouldClassicMode())
             {
-                if (playerControl.Data.Role.IsImpostor)
-                {
-                    GameOptions.TryGetFloat(FloatOptionNames.ImpostorFlashlightSize, out flashlightSize);
-                }
-                else
-                {
-                    GameOptions.TryGetFloat(FloatOptionNames.CrewmateFlashlightSize, out flashlightSize);
-                }
+                return PlayerBodyTypes.Classic;
             }
-            playerControl.SetFlashlightInputMethod();
-            playerControl.lightSource.SetupLightingForGameplay(IsFlashlightEnabled(playerControl), flashlightSize, playerControl.TargetFlashlight.transform);
-        }
-        public override bool IsFlashlightEnabled(PlayerControl playerControl)
-        {
-            if (LobbyBehaviour.Instance != null)
-            {
-                return false;
-            }
-            if (playerControl.Data.IsDead)
-            {
-                return false;
-            }
-            if (!GameManager.Instance.IsHideAndSeek())
-            {
-                return false;
-            }
-            bool flag = false;
-            return GameOptions.TryGetBool(BoolOptionNames.UseFlashlight, out flag) && flag;
+            return PlayerBodyTypes.Normal;
         }
         public override bool CanUse(IUsable usable, PlayerControl player) => true;
         public override void OnPlayerDeath(PlayerControl player, bool assignGhostRole)
